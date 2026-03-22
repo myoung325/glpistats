@@ -4,8 +4,11 @@ A lightweight, zero-dependency, client-side dashboard for visualizing GLPI helpd
 
 This tool allows IT administrators to take standard CSV exports directly from GLPI and instantly generate meaningful charts and metrics to track helpdesk performance, ticket backlogs, and category breakdowns.
 
+🌟 **Live Demo:** Try it out right in your browser via GitHub Pages: [https://myoung325.github.io/glpistats/](https://myoung325.github.io/glpistats/) 
+*(Note: Uploading your CSV to this demo is 100% safe. Processing happens completely locally in your browser.)*
+
 ## 🔒 Privacy First (Zero-Server Architecture)
-Because helpdesk tickets often contain sensitive internal data (usernames, computer names, IP addresses, etc.), **this tool runs entirely in your local web browser.** * No data is uploaded to any server. 
+Because helpdesk tickets often contain sensitive internal data (usernames, computer names, IP addresses, etc.), **this tool runs entirely in your local web browser.** * No data is uploaded to any server.
 * No database is required.
 * It can be run completely offline. 
 
@@ -20,8 +23,9 @@ Because helpdesk tickets often contain sensitive internal data (usernames, compu
   * **Tickets by Category:** A pie chart breakdown of your most common ticket categories.
   * **Tickets by Entity (Dynamic):** A pie chart breakdown of tickets by Entity/Building. *Note: This feature automatically generates clean acronyms from GLPI's standard `Root > Child > Sub-child` entity hierarchy, making it universally applicable for any organization.*
 
-## 🚀 How to Use
+## 🚀 How to Use (Local Run)
 
+If you prefer not to use the GitHub Pages link above, you can run it locally:
 1. Clone or download this repository.
 2. Open `index.html` in any modern web browser.
 3. Export your ticket data from GLPI (see instructions below).
@@ -47,3 +51,7 @@ To ensure the analyzer works correctly, your GLPI export must meet the following
 * **HTML5 Canvas:** All charts are drawn natively using the standard HTML5 `<canvas>` API.
 * **Vanilla JavaScript:** No external charting libraries (like Chart.js or D3), no React, no NPM installs. Just clean, raw JavaScript.
 * **Ghost Ticket Auditing:** The script includes a console-level audit tool. Press `F12` to open your browser's developer console when generating a chart to see a log of any "Ghost Tickets" (tickets that have been sitting open/pending for more than 90 days).
+
+## 🤖 AI Transparency & Credits
+
+Full transparency: The logic, workflow design, and prompt engineering for this project were directed by **Mike Young**, while the actual code implementation (HTML/JS) was generated using Google's **Gemini** large language model.
