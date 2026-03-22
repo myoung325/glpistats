@@ -54,9 +54,11 @@ function parseCSV(csvText) {
 
 // --- 3. Analysis Routing ---
 function runAnalysis(tickets) {
-    const analysisType = document.getElementById('analysisType').value;
-    const interval = document.getElementById('interval').value;
+    const analysisDropdown = document.getElementById('analysisType');
+    const analysisType = analysisDropdown.value;
+    const chartTitle = analysisDropdown.options[analysisDropdown.selectedIndex].text;
     
+    const interval = document.getElementById('interval').value;
     const startInput = document.getElementById('startDate').value;
     const endInput = document.getElementById('endDate').value;
     
@@ -81,7 +83,7 @@ function runAnalysis(tickets) {
         aggregatedData = analyzeTicketsByEntity(tickets, startDate, endDate);
     }
     
-    drawGraph(aggregatedData);
+    drawGraph(aggregatedData, chartTitle);
 }
 
 // --- Helper for Interval Grouping ---
@@ -406,7 +408,7 @@ function analyzeTicketsByCategory(tickets, startDate, endDate) {
     });
 
     const sortedKeys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    return sortedKeys.map(key => ({ label: key, value: counts[key], isPie: true, chartTitle: 'Tickets by Category' }));
+    return sortedKeys.map(key => ({ label: key, value: counts[key], isPie: true }));
 }
 
 // --- 3G. Tickets by Entity (Pie Chart) ---
@@ -445,11 +447,11 @@ function analyzeTicketsByEntity(tickets, startDate, endDate) {
     });
 
     const sortedKeys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    return sortedKeys.map(key => ({ label: key, value: counts[key], isPie: true, chartTitle: 'Tickets by Entity/Building' }));
+    return sortedKeys.map(key => ({ label: key, value: counts[key], isPie: true }));
 }
 
 // --- 4. Drawing Logic ---
-function drawGraph(data) {
+function drawGraph(data, chartTitle = '') {
     const canvas = document.getElementById('graphCanvas');
     const ctx = canvas.getContext('2d');
     
@@ -465,6 +467,19 @@ function drawGraph(data) {
         ctx.fillStyle = '#000';
         ctx.fillText("No data found for this range.", 50, 50);
         return;
+    }
+
+    // --- DRAW MAIN TITLE ---
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = "bold 20px Arial";
+    
+    if (data[0].isPie) {
+        const total = data.reduce((sum, item) => sum + item.value, 0);
+        ctx.fillText(`${chartTitle} (Total: ${total})`, canvas.width / 2, 10);
+    } else {
+        ctx.fillText(chartTitle, canvas.width / 2, 10);
     }
 
     // --- PIE CHART DRAWING LOGIC ---
@@ -498,7 +513,7 @@ function drawGraph(data) {
             ctx.stroke();
 
             const legendStartX = (canvas.width * 0.70);
-            const legendStartY = 40 + (index * 25);
+            const legendStartY = 50 + (index * 25);
             
             if (legendStartY < canvas.height - 20) {
                 ctx.fillStyle = color;
@@ -516,12 +531,6 @@ function drawGraph(data) {
             startAngle += sliceAngle;
         });
 
-        const chartTitle = data[0].chartTitle || 'Pie Chart';
-        ctx.fillStyle = '#000';
-        ctx.textAlign = 'center';
-        ctx.font = "bold 18px Arial";
-        ctx.fillText(`${chartTitle} (Total: ${total})`, centerX, 30);
-
         return; 
     }
 
@@ -531,7 +540,8 @@ function drawGraph(data) {
     const isV3 = isStacked && data[0].value.stackType === 'v3';
     const isV2orV3 = isV2 || isV3;
 
-    const paddingTop = isStacked ? (isV2orV3 ? 80 : 50) : 50;
+    // Increased top padding so tall bars don't hit the legend
+    const paddingTop = isStacked ? (isV2orV3 ? 130 : 110) : 70;
     const paddingSides = 60;
     const paddingBottom = 120; 
     
@@ -543,7 +553,6 @@ function drawGraph(data) {
         : Math.max(...data.map(d => d.value));
     
     if (isStacked) {
-        // Keep the legend reading 1 -> 10+ normally so it's easy to read left-to-right
         const legendItems = isV2orV3 ? [
             { label: '1 Wk', color: '#2E7D32' },  
             { label: '2 Wk', color: '#4CAF50' },  
@@ -564,23 +573,44 @@ function drawGraph(data) {
             { label: '> 4 Weeks', color: '#9C27B0' }  
         ];
         
-        let legendX = paddingSides;
-        let legendY = 15;
         ctx.font = "14px Arial";
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         
+        let legendY = 40; 
+        const itemSpacing = 20; 
+        let rows = [];
+        let currentRow = [];
+        let currentWidth = 0;
+        
+        // Measure and group legend items into rows to keep them perfectly centered
         legendItems.forEach(item => {
-            ctx.fillStyle = item.color;
-            ctx.fillRect(legendX, legendY, 15, 15);
-            ctx.fillStyle = '#000';
-            ctx.fillText(item.label, legendX + 20, legendY + 8);
-            
-            legendX += isV2orV3 ? 75 : 100; 
-            if (legendX > canvas.width - paddingSides - 50) {
-                legendX = paddingSides;
-                legendY += 25;
+            const itemWidth = 15 + 5 + ctx.measureText(item.label).width + itemSpacing;
+            if (currentWidth + itemWidth > canvas.width - (paddingSides * 2) && currentRow.length > 0) {
+                rows.push({ items: currentRow, width: currentWidth - itemSpacing });
+                currentRow = [item];
+                currentWidth = itemWidth;
+            } else {
+                currentRow.push(item);
+                currentWidth += itemWidth;
             }
+        });
+        if (currentRow.length > 0) {
+            rows.push({ items: currentRow, width: currentWidth - itemSpacing });
+        }
+
+        // Draw the centered legend rows
+        rows.forEach(row => {
+            let startX = (canvas.width - row.width) / 2;
+            
+            row.items.forEach(item => {
+                ctx.fillStyle = item.color;
+                ctx.fillRect(startX, legendY - 7, 15, 15); // -7 to visually align box with text middle
+                ctx.fillStyle = '#000';
+                ctx.fillText(item.label, startX + 20, legendY);
+                startX += 15 + 5 + ctx.measureText(item.label).width + itemSpacing;
+            });
+            legendY += 25;
         });
     }
 
@@ -620,7 +650,6 @@ function drawGraph(data) {
             ];
 
             if (isV3) {
-                // Flip the array so 11plus gets drawn first (at the bottom)
                 buckets = [...bucketsV2].reverse();
             } else if (isV2) {
                 buckets = bucketsV2;
