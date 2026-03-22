@@ -84,6 +84,9 @@ function runAnalysis(tickets) {
     }
     
     drawGraph(aggregatedData, chartTitle);
+    
+    // Trigger the new statistics generation
+    generateStatsReport(tickets, startDate, endDate);
 }
 
 // --- Helper for Interval Grouping ---
@@ -694,4 +697,142 @@ function drawGraph(data, chartTitle = '') {
         ctx.fillText(item.label, 0, 0); 
         ctx.restore(); 
     });
+}
+
+// --- 5. Statistics & Math Engine ---
+function generateStatsReport(tickets, startDate, endDate) {
+    let resolutionTimes = [];
+    let byCategory = {};
+    let byEntity = {};
+
+    tickets.forEach(ticket => {
+        // Only calculate resolution time for solved/closed tickets
+        const status = (ticket['Status'] || '').toLowerCase().trim();
+        const isClosed = status.includes('solved') || status.includes('closed');
+        if (!isClosed) return;
+
+        const dateString = ticket['Opening Date'];
+        const endString = ticket['Last Update'];
+        if (!dateString || !endString) return;
+
+        const openDate = new Date(dateString.replace(' ', 'T'));
+        const closeDate = new Date(endString.replace(' ', 'T'));
+        
+        if (isNaN(openDate.getTime()) || isNaN(closeDate.getTime())) return;
+        
+        // Respect the user's date filters
+        if (startDate && openDate < startDate) return;
+        if (endDate && openDate > endDate) return;
+
+        // Calculate time in Days
+        const daysToResolve = (closeDate - openDate) / (1000 * 60 * 60 * 24);
+        if (daysToResolve < 0) return; // Sanity check for weird GLPI data
+
+        resolutionTimes.push(daysToResolve);
+
+        // Group by Category
+        let category = ticket['Category'] || 'Uncategorized';
+        if (!byCategory[category]) byCategory[category] = [];
+        byCategory[category].push(daysToResolve);
+
+        // Group by Entity (using our existing abbreviation logic)
+        let rawEntity = ticket['Entity'] || 'Unassigned';
+        let targetString = rawEntity.includes('>') ? rawEntity.split('>').pop().trim() : rawEntity.trim();
+        let entityAbbr = targetString.split(/\s+/).filter(w => w.length > 0).map(w => w[0].toUpperCase()).join('') || 'Unassigned';
+        
+        if (!byEntity[entityAbbr]) byEntity[entityAbbr] = [];
+        byEntity[entityAbbr].push(daysToResolve);
+    });
+
+    // Helper math function for Mean, Median, and Standard Deviation
+    const getStats = (arr) => {
+        if (!arr.length) return { count: 0, mean: 0, median: 0, stdDev: 0 };
+        
+        const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+        
+        const sorted = [...arr].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        
+        const variance = arr.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / arr.length;
+        const stdDev = Math.sqrt(variance);
+        
+        return {
+            count: arr.length,
+            mean: mean.toFixed(2),
+            median: median.toFixed(2),
+            stdDev: stdDev.toFixed(2)
+        };
+    };
+
+    const overall = getStats(resolutionTimes);
+    
+    // Convert objects to arrays and sort by volume (highest ticket count first)
+    const catStats = Object.keys(byCategory).map(k => ({ name: k, ...getStats(byCategory[k]) })).sort((a, b) => b.count - a.count);
+    const entStats = Object.keys(byEntity).map(k => ({ name: k, ...getStats(byEntity[k]) })).sort((a, b) => b.count - a.count);
+
+    renderStatsHTML(overall, catStats, entStats);
+}
+
+function renderStatsHTML(overall, categories, entities) {
+    const container = document.getElementById('statsContainer');
+    if (!container) return;
+
+    // Helper to generate the inner HTML for the tables
+    const makeTableContent = (title, dataArray, isOverall = false) => {
+        if (!isOverall && dataArray.length === 0) return '';
+        
+        let rows = isOverall 
+            ? `<tr>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; word-break: break-word;">All Closed Tickets</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">${dataArray.count}</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">${dataArray.mean}</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">${dataArray.median}</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">${dataArray.stdDev}</td>
+               </tr>`
+            : dataArray.filter(d => d.count > 0).map(d => `<tr>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; word-break: break-word;">${d.name}</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">${d.count}</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">${d.mean}</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">${d.median}</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">${d.stdDev}</td>
+               </tr>`).join('');
+        
+        return `
+            <h3 style="margin-bottom: 8px; border-bottom: 2px solid #333; padding-bottom: 4px; color: #333; font-size: 16px;">${title}</h3>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.1); background: #fff;">
+                    <thead>
+                        <tr style="background-color: #f8f9fa; border-bottom: 2px solid #ddd;">
+                            <th style="padding: 6px 8px; border: 1px solid #ddd;">Name</th>
+                            <th style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">Count</th>
+                            <th style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">Mean (Days)</th>
+                            <th style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">Median</th>
+                            <th style="padding: 6px 8px; border: 1px solid #ddd; white-space: nowrap;">Std Dev</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    };
+
+    container.innerHTML = `
+        <div style="width: 100%;">
+            <h2 style="margin-top: 20px; color: #2c3e50; font-size: 20px;">📊 Resolution Time Statistics</h2>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 30px; margin-bottom: 30px;">
+                <div style="flex: 1 1 300px; min-width: 0;">
+                    ${makeTableContent('Overall Performance', overall, true)}
+                </div>
+                <div style="flex: 1 1 300px; min-width: 0;">
+                    ${makeTableContent('By Entity', entities)}
+                </div>
+            </div>
+
+            <div style="width: 100%; margin-bottom: 30px;">
+                ${makeTableContent('By Category (Sorted by Volume)', categories)}
+            </div>
+        </div>
+    `;
 }

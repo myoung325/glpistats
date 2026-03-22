@@ -3,102 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GLPI Ticket Stats</title>
+    <title>GLPI Ticket Analyzer</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: auto; }
-        .controls { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 15px; 
-            margin-bottom: 20px; 
-            padding: 15px; 
-            background: #f4f4f4; 
-            border-radius: 8px; 
-        }
-        canvas { 
-            border: 1px solid #ccc; 
-            background: #fff; 
-            display: block;
-            margin-top: 20px;
-        }
-        button { 
-            grid-column: span 2; 
-            padding: 10px; 
-            font-size: 16px; 
-            cursor: pointer; 
-            background-color: #4A90E2;
-            color: white;
-            border: none;
-            border-radius: 4px;
-        }
-        button:hover { background-color: #357ABD; }
-        .canvas-controls {
-            grid-column: span 2;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            border-top: 1px solid #ddd;
-            padding-top: 15px;
-            margin-top: 5px;
-        }
+        body { font-family: sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .controls { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; align-items: flex-end; background: #f5f5f5; padding: 15px; border-radius: 8px; }
+        .control-group { display: flex; flex-direction: column; }
+        label { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        button { padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; height: 38px;}
+        button:hover { background: #0056b3; }
+        canvas { border: 1px solid #ccc; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 100%; height: auto; }
     </style>
 </head>
 <body>
-
-    <h2>GLPI Ticket Stats Dashboard</h2>
+    <h1>GLPI Ticket Analyzer</h1>
     
     <div class="controls">
-        <div>
-            <label for="csvFileInput"><b>Select GLPI CSV:</b></label><br>
-            <input type="file" id="csvFileInput" accept=".csv, .txt">
+        <div class="control-group">
+            <label for="csvFileInput">Upload CSV</label>
+            <input type="file" id="csvFileInput" accept=".csv" style="height: 22px;">
         </div>
-        <div>
-            <label for="analysisType"><b>Analysis Type:</b></label><br>
-            <select id="analysisType">
-                <option value="ticketsOpened">Tickets Opened Per Interval</option>
-                <option value="activeTickets">Active (Open) Tickets Per Interval</option>
-                <option value="activeTicketsAge">Active Tickets by Age (4+ Weeks Stacked)</option>
-                <option value="activeTicketsAgeV2">Active Tickets by Age (10+ Weeks Stacked)</option>
-                <option value="activeTicketsAgeV3">Active Tickets by Age (10+ Weeks Stacked, Oldest First)</option>
-                <option value="categoryPie">Tickets by Category (Pie Chart)</option>
-                <option value="entityPie">Tickets by Entity/Building (Pie Chart)</option>
+        <div class="control-group">
+            <label for="analysisType">Analysis Type</label>
+            <select id="analysisType" style="height: 26px;">
+                <option value="ticketsOpened">Tickets Opened</option>
+                <option value="activeTickets">Active Tickets</option>
+                <option value="activeTicketsAge">Active Tickets by Age (<=4 Wk)</option>
+                <option value="activeTicketsAgeV2">Active Tickets by Age (10+ Wk)</option>
+                <option value="activeTicketsAgeV3">Active Tickets by Age (10+ Wk Flipped)</option>
+                <option value="categoryPie">Tickets by Category</option>
+                <option value="entityPie">Tickets by Entity</option>
             </select>
         </div>
-        <div>
-            <label for="startDate"><b>Start Date (Optional):</b></label><br>
-            <input type="date" id="startDate">
-        </div>
-        <div>
-            <label for="endDate"><b>End Date (Optional):</b></label><br>
-            <input type="date" id="endDate">
-        </div>
-        <div>
-            <label for="interval"><b>Interval:</b></label><br>
-            <select id="interval">
+        <div class="control-group">
+            <label for="interval">Interval</label>
+            <select id="interval" style="height: 26px;">
                 <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
+                <option value="weekly" selected>Weekly</option>
                 <option value="monthly">Monthly</option>
                 <option value="yearly">Yearly</option>
             </select>
         </div>
-
-        <div class="canvas-controls">
-            <div>
-                <label for="canvasWidth"><b>Canvas Width (px):</b></label><br>
-                <input type="number" id="canvasWidth" value="1000" step="100">
-            </div>
-            <div>
-                <label for="canvasHeight"><b>Canvas Height (px):</b></label><br>
-                <input type="number" id="canvasHeight" value="500" step="100">
-            </div>
+        <div class="control-group">
+            <label for="startDate">Start Date</label>
+            <input type="date" id="startDate" style="height: 22px;">
         </div>
-        
+        <div class="control-group">
+            <label for="endDate">End Date</label>
+            <input type="date" id="endDate" style="height: 22px;">
+        </div>
+        <div class="control-group">
+            <label for="canvasWidth">Width (px)</label>
+            <input type="number" id="canvasWidth" placeholder="1000" style="width: 80px; height: 22px;">
+        </div>
+        <div class="control-group">
+            <label for="canvasHeight">Height (px)</label>
+            <input type="number" id="canvasHeight" placeholder="500" style="width: 80px; height: 22px;">
+        </div>
         <button id="generateBtn">Generate Graph</button>
     </div>
 
-    <div style="overflow-x: auto;">
-        <canvas id="graphCanvas" width="1000" height="500"></canvas>
-    </div>
+    <canvas id="graphCanvas"></canvas>
+    
+    <div id="statsContainer" style="margin-top: 40px; font-family: sans-serif;"></div>
 
     <script src="app.js"></script>
 </body>
