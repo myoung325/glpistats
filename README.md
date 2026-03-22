@@ -14,15 +14,16 @@ Because helpdesk tickets often contain sensitive internal data (usernames, compu
 
 ## ✨ Features
 
+* **Resolution Time Statistics:** A powerful built-in stats engine automatically calculates the Mean, Median, and Standard Deviation (in days) for all closed tickets.
+* **Deep-Dive Metric Tables:** Instantly view performance metrics Overall, By Entity, and By Category (sorted by volume) in responsive tables to easily identify bottlenecks, inconsistent resolution times, and extreme outlier tickets.
 * **Custom Date Ranges & Intervals:** Filter your data by specific start and end dates, and view time-series data grouped by Daily, Weekly, Monthly, or Yearly intervals.
 * **Export-Ready Visuals:** Graphs are generated with built-in titles and clean, auto-centering legends—perfect for saving and sharing in team meetings or reports.
 * **Customizable Canvas Size:** Easily adjust the width and height of the generated graph to fit your specific display or reporting needs.
-* **Multiple Analysis Modes:**
-  * **Tickets Opened:** A standard bar chart showing the volume of incoming tickets over time.
-  * **Active (Open) Tickets:** Tracks the true backlog of open tickets over time, accounting for historical "ghost" tickets.
-  * **Active Tickets by Age:** Stacked bar charts breaking down the open backlog by age. Includes views for standard tracking (up to 4+ weeks) and deep-dive tracking (up to 10+ weeks).
-  * **Tickets by Category:** A pie chart breakdown of your most common ticket categories.
-  * **Tickets by Entity (Dynamic):** A pie chart breakdown of tickets by Entity/Building. *Note: This feature automatically generates clean acronyms from GLPI's standard `Root > Child > Sub-child` entity hierarchy, making it universally applicable for any organization.*
+* **Chart Mode - Tickets Opened:** A standard bar chart showing the volume of incoming tickets over time.
+* **Chart Mode - Active (Open) Tickets:** Tracks the true backlog of open tickets over time, accounting for historical "ghost" tickets.
+* **Chart Mode - Active Tickets by Age:** Stacked bar charts breaking down the open backlog by age. Includes views for standard tracking (up to 4+ weeks) and deep-dive tracking (up to 10+ weeks).
+* **Chart Mode - Tickets by Category:** A pie chart breakdown of your most common ticket categories.
+* **Chart Mode - Tickets by Entity (Dynamic):** A pie chart breakdown of tickets by Entity/Building. *Note: This feature automatically generates clean acronyms from GLPI's standard `Root > Child > Sub-child` entity hierarchy, making it universally applicable for any organization.*
 
 ## 🚀 How to Use (Local Run)
 
