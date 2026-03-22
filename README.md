@@ -55,4 +55,4 @@ To ensure the analyzer works correctly, your GLPI export must meet the following
 
 ## 🤖 AI Transparency & Credits
 
-Full transparency: The logic, workflow design, and prompt engineering for this project were directed by **Mike Young**, while the actual code implementation (HTML/JS) was generated using Google's **Gemini** large language model.
+Full transparency: The logic, workflow design, and prompt engineering for this project were directed by **Mike Young**, while the actual code implementation (HTML/JS) was generated using Google's **Gemini** (Advanced math and code with 3.1 Pro) large language model.
