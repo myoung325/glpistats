@@ -71,6 +71,10 @@ function runAnalysis(tickets) {
         aggregatedData = analyzeActiveTickets(tickets, interval, startDate, endDate);
     } else if (analysisType === 'activeTicketsAge') {
         aggregatedData = analyzeActiveTicketsByAge(tickets, interval, startDate, endDate);
+    } else if (analysisType === 'activeTicketsAgeV2') {
+        aggregatedData = analyzeActiveTicketsByAgeV2(tickets, interval, startDate, endDate);
+    } else if (analysisType === 'activeTicketsAgeV3') {
+        aggregatedData = analyzeActiveTicketsByAgeV3(tickets, interval, startDate, endDate);
     } else if (analysisType === 'categoryPie') {
         aggregatedData = analyzeTicketsByCategory(tickets, startDate, endDate);
     } else if (analysisType === 'entityPie') {
@@ -191,7 +195,7 @@ function analyzeActiveTickets(tickets, interval, userStartDate, userEndDate) {
     return sortedKeys.map(key => ({ label: key, value: counts[key] }));
 }
 
-// --- 3C. Active Tickets by Age (Stacked) ---
+// --- 3C. Active Tickets by Age (V1 Stacked) ---
 function analyzeActiveTicketsByAge(tickets, interval, userStartDate, userEndDate) {
     const counts = {};
     const processedTickets = preprocessTickets(tickets);
@@ -212,7 +216,7 @@ function analyzeActiveTicketsByAge(tickets, interval, userStartDate, userEndDate
         const key = getIntervalKey(currentDate, interval);
 
         if (counts[key] === undefined) {
-            counts[key] = { w1: 0, w2: 0, w3: 0, w4: 0, w5plus: 0, total: 0, isStacked: true };
+            counts[key] = { w1: 0, w2: 0, w3: 0, w4: 0, w5plus: 0, total: 0, isStacked: true, stackType: 'v1' };
             let intervalEvalDate = new Date(currentDate);
 
             if (interval === 'monthly') {
@@ -248,7 +252,143 @@ function analyzeActiveTicketsByAge(tickets, interval, userStartDate, userEndDate
     return sortedKeys.map(key => ({ label: key, value: counts[key] }));
 }
 
-// --- 3D. Tickets by Category (Pie Chart) ---
+// --- 3D. Active Tickets by Age (V2 10+ Weeks Stacked) ---
+function analyzeActiveTicketsByAgeV2(tickets, interval, userStartDate, userEndDate) {
+    const counts = {};
+    const processedTickets = preprocessTickets(tickets);
+    
+    let minDate = userStartDate;
+    let maxDate = userEndDate || new Date();
+
+    if (!minDate) {
+        let earliest = new Date();
+        processedTickets.forEach(t => { if (t.openDate < earliest) earliest = t.openDate; });
+        minDate = earliest;
+    }
+
+    let currentDate = new Date(minDate);
+    currentDate.setHours(0, 0, 0, 0);
+
+    while (currentDate <= maxDate) {
+        const key = getIntervalKey(currentDate, interval);
+
+        if (counts[key] === undefined) {
+            counts[key] = { 
+                w1: 0, w2: 0, w3: 0, w4: 0, w5: 0, 
+                w6: 0, w7: 0, w8: 0, w9: 0, w10: 0, 
+                w11plus: 0, total: 0, isStacked: true, stackType: 'v2' 
+            };
+            
+            let intervalEvalDate = new Date(currentDate);
+
+            if (interval === 'monthly') {
+                intervalEvalDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+            } else if (interval === 'yearly') {
+                intervalEvalDate = new Date(currentDate.getFullYear(), 11, 31, 23, 59, 59);
+            } else if (interval === 'weekly') {
+                const day = intervalEvalDate.getDay();
+                const diff = intervalEvalDate.getDate() + (6 - day);
+                intervalEvalDate.setDate(diff);
+                intervalEvalDate.setHours(23, 59, 59, 999);
+            } else {
+                intervalEvalDate.setHours(23, 59, 59, 999);
+            }
+
+            processedTickets.forEach(ticket => {
+                if (ticket.openDate <= intervalEvalDate && ticket.closeDate >= intervalEvalDate) {
+                    counts[key].total++;
+                    const ageDays = (intervalEvalDate - ticket.openDate) / (1000 * 60 * 60 * 24);
+                    
+                    if (ageDays <= 7) counts[key].w1++;
+                    else if (ageDays <= 14) counts[key].w2++;
+                    else if (ageDays <= 21) counts[key].w3++;
+                    else if (ageDays <= 28) counts[key].w4++;
+                    else if (ageDays <= 35) counts[key].w5++;
+                    else if (ageDays <= 42) counts[key].w6++;
+                    else if (ageDays <= 49) counts[key].w7++;
+                    else if (ageDays <= 56) counts[key].w8++;
+                    else if (ageDays <= 63) counts[key].w9++;
+                    else if (ageDays <= 70) counts[key].w10++;
+                    else counts[key].w11plus++;
+                }
+            });
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const sortedKeys = Object.keys(counts).sort();
+    return sortedKeys.map(key => ({ label: key, value: counts[key] }));
+}
+
+// --- 3E. Active Tickets by Age (V3 10+ Weeks Stacked, Flipped) ---
+function analyzeActiveTicketsByAgeV3(tickets, interval, userStartDate, userEndDate) {
+    const counts = {};
+    const processedTickets = preprocessTickets(tickets);
+    
+    let minDate = userStartDate;
+    let maxDate = userEndDate || new Date();
+
+    if (!minDate) {
+        let earliest = new Date();
+        processedTickets.forEach(t => { if (t.openDate < earliest) earliest = t.openDate; });
+        minDate = earliest;
+    }
+
+    let currentDate = new Date(minDate);
+    currentDate.setHours(0, 0, 0, 0);
+
+    while (currentDate <= maxDate) {
+        const key = getIntervalKey(currentDate, interval);
+
+        if (counts[key] === undefined) {
+            counts[key] = { 
+                w1: 0, w2: 0, w3: 0, w4: 0, w5: 0, 
+                w6: 0, w7: 0, w8: 0, w9: 0, w10: 0, 
+                w11plus: 0, total: 0, isStacked: true, stackType: 'v3' 
+            };
+            
+            let intervalEvalDate = new Date(currentDate);
+
+            if (interval === 'monthly') {
+                intervalEvalDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+            } else if (interval === 'yearly') {
+                intervalEvalDate = new Date(currentDate.getFullYear(), 11, 31, 23, 59, 59);
+            } else if (interval === 'weekly') {
+                const day = intervalEvalDate.getDay();
+                const diff = intervalEvalDate.getDate() + (6 - day);
+                intervalEvalDate.setDate(diff);
+                intervalEvalDate.setHours(23, 59, 59, 999);
+            } else {
+                intervalEvalDate.setHours(23, 59, 59, 999);
+            }
+
+            processedTickets.forEach(ticket => {
+                if (ticket.openDate <= intervalEvalDate && ticket.closeDate >= intervalEvalDate) {
+                    counts[key].total++;
+                    const ageDays = (intervalEvalDate - ticket.openDate) / (1000 * 60 * 60 * 24);
+                    
+                    if (ageDays <= 7) counts[key].w1++;
+                    else if (ageDays <= 14) counts[key].w2++;
+                    else if (ageDays <= 21) counts[key].w3++;
+                    else if (ageDays <= 28) counts[key].w4++;
+                    else if (ageDays <= 35) counts[key].w5++;
+                    else if (ageDays <= 42) counts[key].w6++;
+                    else if (ageDays <= 49) counts[key].w7++;
+                    else if (ageDays <= 56) counts[key].w8++;
+                    else if (ageDays <= 63) counts[key].w9++;
+                    else if (ageDays <= 70) counts[key].w10++;
+                    else counts[key].w11plus++;
+                }
+            });
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const sortedKeys = Object.keys(counts).sort();
+    return sortedKeys.map(key => ({ label: key, value: counts[key] }));
+}
+
+// --- 3F. Tickets by Category (Pie Chart) ---
 function analyzeTicketsByCategory(tickets, startDate, endDate) {
     const counts = {};
 
@@ -269,7 +409,7 @@ function analyzeTicketsByCategory(tickets, startDate, endDate) {
     return sortedKeys.map(key => ({ label: key, value: counts[key], isPie: true, chartTitle: 'Tickets by Category' }));
 }
 
-// --- 3E. Tickets by Entity (Pie Chart) ---
+// --- 3G. Tickets by Entity (Pie Chart) ---
 function analyzeTicketsByEntity(tickets, startDate, endDate) {
     const counts = {};
 
@@ -284,24 +424,19 @@ function analyzeTicketsByEntity(tickets, startDate, endDate) {
 
         let rawEntity = ticket['Entity'] || 'Unassigned';
         
-        // --- Dynamic Abbreviation Logic ---
         let targetString = rawEntity;
-        
-        // 1. If there's a hierarchy, grab only the part after the last '>'
         if (rawEntity.includes('>')) {
             targetString = rawEntity.split('>').pop().trim();
         } else {
             targetString = rawEntity.trim();
         }
 
-        // 2. Create acronym by taking the first letter of each word
         let entityAbbr = targetString
-            .split(/\s+/)                         // Split by spaces
-            .filter(word => word.length > 0)      // Ignore extra blank spaces
-            .map(word => word[0].toUpperCase())   // Grab first letter & capitalize
-            .join('');                            // Smash them back together
+            .split(/\s+/)
+            .filter(word => word.length > 0)
+            .map(word => word[0].toUpperCase())
+            .join('');
 
-        // Fallback just in case the entity field was completely empty
         if (!entityAbbr) {
             entityAbbr = 'Unassigned';
         }
@@ -381,7 +516,6 @@ function drawGraph(data) {
             startAngle += sliceAngle;
         });
 
-        // Dynamic title based on the data sent!
         const chartTitle = data[0].chartTitle || 'Pie Chart';
         ctx.fillStyle = '#000';
         ctx.textAlign = 'center';
@@ -393,8 +527,11 @@ function drawGraph(data) {
 
     // --- BAR CHART DRAWING LOGIC ---
     const isStacked = data[0].value && data[0].value.isStacked === true;
+    const isV2 = isStacked && data[0].value.stackType === 'v2';
+    const isV3 = isStacked && data[0].value.stackType === 'v3';
+    const isV2orV3 = isV2 || isV3;
 
-    const paddingTop = isStacked ? 80 : 50;
+    const paddingTop = isStacked ? (isV2orV3 ? 80 : 50) : 50;
     const paddingSides = 60;
     const paddingBottom = 120; 
     
@@ -406,7 +543,20 @@ function drawGraph(data) {
         : Math.max(...data.map(d => d.value));
     
     if (isStacked) {
-        const legendItems = [
+        // Keep the legend reading 1 -> 10+ normally so it's easy to read left-to-right
+        const legendItems = isV2orV3 ? [
+            { label: '1 Wk', color: '#2E7D32' },  
+            { label: '2 Wk', color: '#4CAF50' },  
+            { label: '3 Wk', color: '#8BC34A' },  
+            { label: '4 Wk', color: '#CDDC39' },  
+            { label: '5 Wk', color: '#FFEB3B' },  
+            { label: '6 Wk', color: '#FFC107' },  
+            { label: '7 Wk', color: '#FF9800' },  
+            { label: '8 Wk', color: '#FF5722' },  
+            { label: '9 Wk', color: '#E53935' },  
+            { label: '10 Wk', color: '#B71C1C' }, 
+            { label: '10+ Wk', color: '#9C27B0' } 
+        ] : [
             { label: '<= 1 Week', color: '#4CAF50' },
             { label: '2 Weeks', color: '#FFC107' },  
             { label: '3 Weeks', color: '#FF9800' },   
@@ -415,16 +565,22 @@ function drawGraph(data) {
         ];
         
         let legendX = paddingSides;
+        let legendY = 15;
         ctx.font = "14px Arial";
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         
         legendItems.forEach(item => {
             ctx.fillStyle = item.color;
-            ctx.fillRect(legendX, 20, 15, 15);
+            ctx.fillRect(legendX, legendY, 15, 15);
             ctx.fillStyle = '#000';
-            ctx.fillText(item.label, legendX + 20, 27);
-            legendX += 100; 
+            ctx.fillText(item.label, legendX + 20, legendY + 8);
+            
+            legendX += isV2orV3 ? 75 : 100; 
+            if (legendX > canvas.width - paddingSides - 50) {
+                legendX = paddingSides;
+                legendY += 25;
+            }
         });
     }
 
@@ -448,13 +604,35 @@ function drawGraph(data) {
         ctx.font = barWidth < 20 ? "10px Arial" : "14px Arial"; 
 
         if (isStacked) {
-            const buckets = [
-                { key: 'w1', color: '#4CAF50' },
-                { key: 'w2', color: '#FFC107' },
-                { key: 'w3', color: '#FF9800' },
-                { key: 'w4', color: '#F44336' },
-                { key: 'w5plus', color: '#9C27B0' }
+            let buckets = [];
+            const bucketsV2 = [
+                { key: 'w1', color: '#2E7D32' },
+                { key: 'w2', color: '#4CAF50' },
+                { key: 'w3', color: '#8BC34A' },
+                { key: 'w4', color: '#CDDC39' },
+                { key: 'w5', color: '#FFEB3B' },
+                { key: 'w6', color: '#FFC107' },
+                { key: 'w7', color: '#FF9800' },
+                { key: 'w8', color: '#FF5722' },
+                { key: 'w9', color: '#E53935' },
+                { key: 'w10', color: '#B71C1C' },
+                { key: 'w11plus', color: '#9C27B0' }
             ];
+
+            if (isV3) {
+                // Flip the array so 11plus gets drawn first (at the bottom)
+                buckets = [...bucketsV2].reverse();
+            } else if (isV2) {
+                buckets = bucketsV2;
+            } else {
+                buckets = [
+                    { key: 'w1', color: '#4CAF50' },
+                    { key: 'w2', color: '#FFC107' },
+                    { key: 'w3', color: '#FF9800' },
+                    { key: 'w4', color: '#F44336' },
+                    { key: 'w5plus', color: '#9C27B0' }
+                ];
+            }
 
             buckets.forEach(b => {
                 const count = item.value[b.key];
