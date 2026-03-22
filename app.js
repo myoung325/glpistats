@@ -73,6 +73,8 @@ function runAnalysis(tickets) {
         aggregatedData = analyzeActiveTicketsByAge(tickets, interval, startDate, endDate);
     } else if (analysisType === 'categoryPie') {
         aggregatedData = analyzeTicketsByCategory(tickets, startDate, endDate);
+    } else if (analysisType === 'entityPie') {
+        aggregatedData = analyzeTicketsByEntity(tickets, startDate, endDate);
     }
     
     drawGraph(aggregatedData);
@@ -259,14 +261,56 @@ function analyzeTicketsByCategory(tickets, startDate, endDate) {
         if (startDate && date < startDate) return;
         if (endDate && date > endDate) return;
 
-        // **IMPORTANT:** Check your CSV header! It's usually 'Category' but could be different.
         let category = ticket['Category'] || 'Uncategorized';
         counts[category] = (counts[category] || 0) + 1;
     });
 
-    // Sort categories from largest to smallest slice
     const sortedKeys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    return sortedKeys.map(key => ({ label: key, value: counts[key], isPie: true }));
+    return sortedKeys.map(key => ({ label: key, value: counts[key], isPie: true, chartTitle: 'Tickets by Category' }));
+}
+
+// --- 3E. Tickets by Entity (Pie Chart) ---
+function analyzeTicketsByEntity(tickets, startDate, endDate) {
+    const counts = {};
+
+    tickets.forEach(ticket => {
+        const dateString = ticket['Opening Date'];
+        if (!dateString) return;
+
+        const date = new Date(dateString.replace(' ', 'T'));
+        if (isNaN(date.getTime())) return; 
+        if (startDate && date < startDate) return;
+        if (endDate && date > endDate) return;
+
+        let rawEntity = ticket['Entity'] || 'Unassigned';
+        
+        // --- Dynamic Abbreviation Logic ---
+        let targetString = rawEntity;
+        
+        // 1. If there's a hierarchy, grab only the part after the last '>'
+        if (rawEntity.includes('>')) {
+            targetString = rawEntity.split('>').pop().trim();
+        } else {
+            targetString = rawEntity.trim();
+        }
+
+        // 2. Create acronym by taking the first letter of each word
+        let entityAbbr = targetString
+            .split(/\s+/)                         // Split by spaces
+            .filter(word => word.length > 0)      // Ignore extra blank spaces
+            .map(word => word[0].toUpperCase())   // Grab first letter & capitalize
+            .join('');                            // Smash them back together
+
+        // Fallback just in case the entity field was completely empty
+        if (!entityAbbr) {
+            entityAbbr = 'Unassigned';
+        }
+
+        counts[entityAbbr] = (counts[entityAbbr] || 0) + 1;
+    });
+
+    const sortedKeys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    return sortedKeys.map(key => ({ label: key, value: counts[key], isPie: true, chartTitle: 'Tickets by Entity/Building' }));
 }
 
 // --- 4. Drawing Logic ---
@@ -293,12 +337,10 @@ function drawGraph(data) {
         const total = data.reduce((sum, item) => sum + item.value, 0);
         let startAngle = 0;
         
-        // Center the pie chart on the left side of the canvas
         const centerX = canvas.width * 0.35;
         const centerY = canvas.height / 2;
         const radius = Math.min(centerX, centerY) - 40;
 
-        // A nice palette of colors for our slices
         const colors = [
             '#4A90E2', '#50E3C2', '#B8E986', '#F5A623', '#D0021B', 
             '#BD10E0', '#9013FE', '#8B572A', '#417505', '#F8E71C',
@@ -309,7 +351,6 @@ function drawGraph(data) {
             const sliceAngle = (item.value / total) * 2 * Math.PI;
             const color = colors[index % colors.length];
 
-            // Draw the slice
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
             ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
@@ -317,16 +358,13 @@ function drawGraph(data) {
             ctx.fillStyle = color;
             ctx.fill();
             
-            // Draw a white border around slices for clarity
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Draw the Legend on the right side
             const legendStartX = (canvas.width * 0.70);
             const legendStartY = 40 + (index * 25);
             
-            // Only draw legend items if they fit on the canvas, otherwise just truncate
             if (legendStartY < canvas.height - 20) {
                 ctx.fillStyle = color;
                 ctx.fillRect(legendStartX, legendStartY - 12, 15, 15);
@@ -335,10 +373,7 @@ function drawGraph(data) {
                 ctx.textBaseline = 'middle';
                 ctx.font = "14px Arial";
                 
-                // Calculate percentage
                 const percentage = ((item.value / total) * 100).toFixed(1);
-                
-                // Truncate really long category names
                 let labelStr = item.label.length > 30 ? item.label.substring(0, 27) + "..." : item.label;
                 ctx.fillText(`${labelStr} - ${item.value} (${percentage}%)`, legendStartX + 25, legendStartY - 4);
             }
@@ -346,16 +381,17 @@ function drawGraph(data) {
             startAngle += sliceAngle;
         });
 
-        // Add a title
+        // Dynamic title based on the data sent!
+        const chartTitle = data[0].chartTitle || 'Pie Chart';
         ctx.fillStyle = '#000';
         ctx.textAlign = 'center';
         ctx.font = "bold 18px Arial";
-        ctx.fillText(`Tickets by Category (Total: ${total})`, centerX, 30);
+        ctx.fillText(`${chartTitle} (Total: ${total})`, centerX, 30);
 
-        return; // Exit here so we don't accidentally draw bar chart axes!
+        return; 
     }
 
-    // --- BAR CHART DRAWING LOGIC (Unchanged) ---
+    // --- BAR CHART DRAWING LOGIC ---
     const isStacked = data[0].value && data[0].value.isStacked === true;
 
     const paddingTop = isStacked ? 80 : 50;
