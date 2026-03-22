@@ -40,7 +40,7 @@ To ensure the analyzer works correctly, your GLPI export must meet the following
    * `ID`
    * `Opening Date` (Crucial for time-series data)
    * `Status`
-   * `Last update` (Used to determine when a ticket was closed)
+   * `Last Update` (Used to determine when a ticket was closed)
    * `Category` (Required for the Category pie chart)
    * `Entity` (Required for the Entity pie chart)
 
