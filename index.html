@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLPI Ticket Stats</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: auto; }
+        .controls { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+            margin-bottom: 20px; 
+            padding: 15px; 
+            background: #f4f4f4; 
+            border-radius: 8px; 
+        }
+        canvas { 
+            border: 1px solid #ccc; 
+            background: #fff; 
+            display: block;
+            margin-top: 20px;
+        }
+        button { 
+            grid-column: span 2; 
+            padding: 10px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            background-color: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover { background-color: #357ABD; }
+        .canvas-controls {
+            grid-column: span 2;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            border-top: 1px solid #ddd;
+            padding-top: 15px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>GLPI Ticket Stats Dashboard</h2>
+    
+    <div class="controls">
+        <div>
+            <label for="csvFileInput"><b>Upload GLPI CSV:</b></label><br>
+            <input type="file" id="csvFileInput" accept=".csv, .txt">
+        </div>
+        <div>
+            <label for="analysisType"><b>Analysis Type:</b></label><br>
+            <select id="analysisType">
+                <option value="ticketsOpened">Tickets Opened Per Interval</option>
+                <option value="activeTickets">Active (Open) Tickets Per Interval</option>
+                <option value="activeTicketsAge">Active Tickets by Age (Stacked)</option>
+                <option value="categoryPie">Tickets by Category (Pie Chart)</option>
+            </select>
+        </div>
+        <div>
+            <label for="startDate"><b>Start Date (Optional):</b></label><br>
+            <input type="date" id="startDate">
+        </div>
+        <div>
+            <label for="endDate"><b>End Date (Optional):</b></label><br>
+            <input type="date" id="endDate">
+        </div>
+        <div>
+            <label for="interval"><b>Interval:</b></label><br>
+            <select id="interval">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+            </select>
+        </div>
+
+        <div class="canvas-controls">
+            <div>
+                <label for="canvasWidth"><b>Canvas Width (px):</b></label><br>
+                <input type="number" id="canvasWidth" value="1000" step="100">
+            </div>
+            <div>
+                <label for="canvasHeight"><b>Canvas Height (px):</b></label><br>
+                <input type="number" id="canvasHeight" value="500" step="100">
+            </div>
+        </div>
+        
+        <button id="generateBtn">Generate Graph</button>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <canvas id="graphCanvas" width="1000" height="500"></canvas>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
