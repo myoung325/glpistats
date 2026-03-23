@@ -701,29 +701,40 @@ function drawGraph(data, chartTitle = '') {
 
 // --- 5. Statistics & Math Engine ---
 function generateStatsReport(tickets, startDate, endDate) {
+    // --- NEW: Filter tickets for BOTH the core tables AND Quick Insights ---
+    const filteredTickets = tickets.filter(ticket => {
+        const dateString = ticket['Opening Date'];
+        if (!dateString) return false; 
+        
+        const openDate = new Date(dateString.replace(' ', 'T'));
+        if (isNaN(openDate.getTime())) return false; 
+        
+        // Apply user's date filters
+        if (startDate && openDate < startDate) return false;
+        if (endDate && openDate > endDate) return false;
+        
+        return true; 
+    });
+
     let resolutionTimes = [];
     let byCategory = {};
     let byEntity = {};
 
-    tickets.forEach(ticket => {
-        // Only calculate resolution time for solved/closed tickets
+    // Use the filtered array for all remaining math
+    filteredTickets.forEach(ticket => {
         const status = (ticket['Status'] || '').toLowerCase().trim();
         const isClosed = status.includes('solved') || status.includes('closed');
         if (!isClosed) return;
 
-        const dateString = ticket['Opening Date'];
         const endString = ticket['Last Update'];
-        if (!dateString || !endString) return;
+        if (!endString) return;
 
+        const dateString = ticket['Opening Date'];
         const openDate = new Date(dateString.replace(' ', 'T'));
         const closeDate = new Date(endString.replace(' ', 'T'));
         
-        if (isNaN(openDate.getTime()) || isNaN(closeDate.getTime())) return;
+        if (isNaN(closeDate.getTime())) return;
         
-        // Respect the user's date filters
-        if (startDate && openDate < startDate) return;
-        if (endDate && openDate > endDate) return;
-
         // Calculate time in Days
         const daysToResolve = (closeDate - openDate) / (1000 * 60 * 60 * 24);
         if (daysToResolve < 0) return; // Sanity check for weird GLPI data
@@ -771,17 +782,75 @@ function generateStatsReport(tickets, startDate, endDate) {
     const catStats = Object.keys(byCategory).map(k => ({ name: k, ...getStats(byCategory[k]) })).sort((a, b) => b.count - a.count);
     const entStats = Object.keys(byEntity).map(k => ({ name: k, ...getStats(byEntity[k]) })).sort((a, b) => b.count - a.count);
 
-    renderStatsHTML(overall, catStats, entStats);
+    // Pass the FILTERED tickets down instead of the full raw array
+    renderStatsHTML(overall, catStats, entStats, filteredTickets);
 }
 
-function renderStatsHTML(overall, categories, entities) {
+function renderStatsHTML(overall, categories, entities, tickets = []) {
     const container = document.getElementById('statsContainer');
     if (!container) return;
 
-    // Helper to generate the inner HTML for the tables
+    // --- NEW: Calculate Quick Insights ---
+    let sameDayCount = 0;
+    let closedCount = 0;
+    let totalOpenAgeDays = 0;
+    let openTicketsWithAge = 0;
+    let dayCounts = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0}; // 0 = Sunday
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const now = new Date(); // Used to calculate age of open tickets
+
+    tickets.forEach(t => {
+        const openDateStr = t['Opening Date'] || t.openingDate || t['Opening date'];
+        const updateDateStr = t['Last Update'] || t['Last update'] || t.lastUpdate;
+        const status = t['Status'] || t.status;
+
+        if (!openDateStr) return;
+        const openDate = new Date(openDateStr);
+        if (isNaN(openDate)) return;
+
+        // 1. Busiest Day Math
+        dayCounts[openDate.getDay()]++;
+
+        const isClosed = status === 'Closed' || status === 'Solved';
+
+        if (isClosed) {
+            closedCount++;
+            const closeDate = new Date(updateDateStr);
+            if (!isNaN(closeDate) && openDate.toDateString() === closeDate.toDateString()) {
+                // 2. Same-Day Resolution Math
+                sameDayCount++;
+            }
+        } else {
+            // 3. Mean Age of Open Tickets Math
+            const ageMs = now - openDate;
+            totalOpenAgeDays += (ageMs / (1000 * 60 * 60 * 24));
+            openTicketsWithAge++;
+        }
+    });
+
+    // Finalize Insight Variables
+    const sameDayRate = closedCount > 0 ? ((sameDayCount / closedCount) * 100).toFixed(1) + '%' : 'N/A';
+    const keepUpRatio = `${tickets.length} Opened / ${closedCount} Closed`;
+    const meanOpenAge = openTicketsWithAge > 0 ? (totalOpenAgeDays / openTicketsWithAge).toFixed(1) + ' days' : '0 open tickets';
+    
+    let busiestDay = dayNames[0];
+    let maxCount = dayCounts[0];
+    for(let i=1; i<7; i++) {
+        if(dayCounts[i] > maxCount) {
+            maxCount = dayCounts[i];
+            busiestDay = dayNames[i];
+        }
+    }
+
+    // Top 3 / Bottom 3 Categories (using the already calculated categories array)
+    const validCats = categories.filter(c => c.count > 0).sort((a, b) => a.mean - b.mean);
+    const quickest = validCats.slice(0, 3).map(c => `• ${c.name} (${c.mean}d)`).join('<br>') || 'N/A';
+    const slowest = validCats.slice(-3).reverse().map(c => `• ${c.name} (${c.mean}d)`).join('<br>') || 'N/A';
+
+
+    // --- Existing Table Generators ---
     const makeTableContent = (title, dataArray, isOverall = false) => {
         if (!isOverall && dataArray.length === 0) return '';
-        
         let rows = isOverall 
             ? `<tr>
                 <td style="padding: 6px 8px; border: 1px solid #ddd; word-break: break-word;">All Closed Tickets</td>
@@ -817,6 +886,45 @@ function renderStatsHTML(overall, categories, entities) {
         `;
     };
 
+    // --- NEW: Insights Table Generator ---
+    const makeInsightsTable = () => {
+        if (tickets.length === 0) return ''; // Hide if no raw tickets are passed
+        return `
+            <h3 style="margin-top: 25px; margin-bottom: 8px; border-bottom: 2px solid #333; padding-bottom: 4px; color: #333; font-size: 16px;">💡 Quick Insights</h3>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.1); background: #fff;">
+                    <tbody>
+                        <tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 8px; font-weight: bold; background-color: #f8f9fa; width: 45%;">⚡ Same-Day Resolution</td>
+                            <td style="padding: 8px;">${sameDayRate}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 8px; font-weight: bold; background-color: #f8f9fa;">📅 Busiest Day</td>
+                            <td style="padding: 8px;">${busiestDay}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 8px; font-weight: bold; background-color: #f8f9fa;">⚖️ Keep Up Ratio</td>
+                            <td style="padding: 8px;">${keepUpRatio}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 8px; font-weight: bold; background-color: #f8f9fa;">🧟 Mean Age (Open)</td>
+                            <td style="padding: 8px;">${meanOpenAge}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 8px; font-weight: bold; background-color: #f8f9fa;">🏆 Quickest Categories</td>
+                            <td style="padding: 8px; line-height: 1.4;">${quickest}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; font-weight: bold; background-color: #f8f9fa;">🐌 Slowest Categories</td>
+                            <td style="padding: 8px; line-height: 1.4;">${slowest}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    };
+
+    // Render the final layout
     container.innerHTML = `
         <div style="width: 100%;">
             <h2 style="margin-top: 20px; color: #2c3e50; font-size: 20px;">📊 Resolution Time Statistics</h2>
@@ -824,6 +932,7 @@ function renderStatsHTML(overall, categories, entities) {
             <div style="display: flex; flex-wrap: wrap; gap: 30px; margin-bottom: 30px;">
                 <div style="flex: 1 1 300px; min-width: 0;">
                     ${makeTableContent('Overall Performance', overall, true)}
+                    ${makeInsightsTable()} 
                 </div>
                 <div style="flex: 1 1 300px; min-width: 0;">
                     ${makeTableContent('By Entity', entities)}
