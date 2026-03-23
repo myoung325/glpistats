@@ -842,11 +842,10 @@ function renderStatsHTML(overall, categories, entities, tickets = []) {
         }
     }
 
-    // Top 3 / Bottom 3 Categories (using the already calculated categories array)
+    // Top 5 / Bottom 5 Categories (using the already calculated categories array)
     const validCats = categories.filter(c => c.count > 0).sort((a, b) => a.mean - b.mean);
-    const quickest = validCats.slice(0, 3).map(c => `• ${c.name} (${c.mean}d)`).join('<br>') || 'N/A';
-    const slowest = validCats.slice(-3).reverse().map(c => `• ${c.name} (${c.mean}d)`).join('<br>') || 'N/A';
-
+    const quickest = validCats.slice(0, 5).map(c => `• ${c.name} (${c.mean}d)`).join('<br>') || 'N/A';
+    const slowest = validCats.slice(-5).reverse().map(c => `• ${c.name} (${c.mean}d)`).join('<br>') || 'N/A';
 
     // --- Existing Table Generators ---
     const makeTableContent = (title, dataArray, isOverall = false) => {
@@ -886,11 +885,11 @@ function renderStatsHTML(overall, categories, entities, tickets = []) {
         `;
     };
 
-    // --- NEW: Insights Table Generator ---
+// --- NEW: Insights Table Generator ---
     const makeInsightsTable = () => {
         if (tickets.length === 0) return ''; // Hide if no raw tickets are passed
         return `
-            <h3 style="margin-top: 25px; margin-bottom: 8px; border-bottom: 2px solid #333; padding-bottom: 4px; color: #333; font-size: 16px;">💡 Quick Insights</h3>
+            <h3 style="margin-bottom: 8px; border-bottom: 2px solid #333; padding-bottom: 4px; color: #333; font-size: 16px;">💡 Quick Insights</h3>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.1); background: #fff;">
                     <tbody>
@@ -932,10 +931,12 @@ function renderStatsHTML(overall, categories, entities, tickets = []) {
             <div style="display: flex; flex-wrap: wrap; gap: 30px; margin-bottom: 30px;">
                 <div style="flex: 1 1 300px; min-width: 0;">
                     ${makeTableContent('Overall Performance', overall, true)}
-                    ${makeInsightsTable()} 
+                    <div style="margin-top: 25px;">
+                        ${makeTableContent('By Entity', entities)}
+                    </div>
                 </div>
                 <div style="flex: 1 1 300px; min-width: 0;">
-                    ${makeTableContent('By Entity', entities)}
+                    ${makeInsightsTable()} 
                 </div>
             </div>
 
