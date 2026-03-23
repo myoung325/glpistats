@@ -14,6 +14,7 @@ Because helpdesk tickets often contain sensitive internal data (usernames, compu
 
 ## ✨ Features
 
+* **Quick Insights Dashboard:** A high-level executive summary that dynamically filters based on your selected date range. Instantly view key performance indicators including your Same-Day Resolution Rate, Busiest Day of the Week, Keep Up Ratio (Opened vs. Closed), Mean Age of Open Tickets, and your Top 3 Quickest/Slowest Categories.
 * **Resolution Time Statistics:** A powerful built-in stats engine automatically calculates the Mean, Median, and Standard Deviation (in days) for all closed tickets.
 * **Deep-Dive Metric Tables:** Instantly view performance metrics Overall, By Entity, and By Category (sorted by volume) in responsive tables to easily identify bottlenecks, inconsistent resolution times, and extreme outlier tickets.
 * **Custom Date Ranges & Intervals:** Filter your data by specific start and end dates, and view time-series data grouped by Daily, Weekly, Monthly, or Yearly intervals.
