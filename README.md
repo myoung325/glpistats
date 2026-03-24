@@ -23,6 +23,7 @@ Because helpdesk tickets often contain sensitive internal data (usernames, compu
 * **Chart Mode - Tickets Opened:** A standard bar chart showing the volume of incoming tickets over time.
 * **Chart Mode - Tickets Closed:** A standard bar chart showing the volume of resolved tickets over time.
 * **Chart Mode - Tickets Opened vs. Closed:** A side-by-side grouped bar chart comparing incoming tickets against resolved tickets to easily visualize team throughput and queue management.
+* **Chart Mode - Resolution Rate:** A cohort analysis chart displaying the 0-100% completion rate for tickets originating in a specific time period.
 * **Chart Mode - Active (Open) Tickets:** Tracks the true backlog of open tickets over time, accounting for historical "ghost" tickets.
 * **Chart Mode - Active Tickets by Age:** Stacked bar charts breaking down the open backlog by age. Includes views for standard tracking (up to 4+ weeks) and deep-dive tracking (up to 10+ weeks).
 * **Chart Mode - Tickets by Category:** A pie chart breakdown of your most common ticket categories.
