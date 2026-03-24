@@ -115,6 +115,28 @@ function getIntervalKey(date, interval) {
         const wMm = String(weekStart.getMonth() + 1).padStart(2, '0');
         const wDd = String(weekStart.getDate()).padStart(2, '0');
         return `${wYyyy}-${wMm}-${wDd} (Wk)`;
+        
+    } else if (interval === 'biweekly') {
+        // Use a fresh date object (bwDate) so we don't clash with 'd' above
+        const bwDate = new Date(date);
+        bwDate.setHours(0, 0, 0, 0); // Normalize to midnight
+        
+        // Use a known Sunday in history (Jan 4, 1970) as our anchor point
+        const epochSunday = new Date(1970, 0, 4); 
+        
+        // Use Math.round to safely step over Daylight Saving Time shifts
+        const diffDays = Math.round((bwDate - epochSunday) / 86400000); 
+        
+        // Figure out where we are in the 14-day cycle and snap back to the start
+        const daysToSubtract = diffDays % 14; 
+        bwDate.setDate(bwDate.getDate() - daysToSubtract);
+        
+        // Format it with new variable names to avoid constant redeclaration errors
+        const bwYyyy = bwDate.getFullYear();
+        const bwMm = String(bwDate.getMonth() + 1).padStart(2, '0');
+        const bwDd = String(bwDate.getDate()).padStart(2, '0');
+        
+        return `${bwYyyy}-${bwMm}-${bwDd} (Bi-Wk)`;
     }
 }
 
