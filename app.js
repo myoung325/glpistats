@@ -71,8 +71,10 @@ function runAnalysis(tickets) {
         aggregatedData = analyzeTicketsOpened(tickets, interval, startDate, endDate);
     } else if (analysisType === 'ticketsClosed') {
         aggregatedData = analyzeTicketsClosed(tickets, interval, startDate, endDate);
-    } else if (analysisType === 'openedVsClosed') { // <-- ADD THIS
+    } else if (analysisType === 'openedVsClosed') {
         aggregatedData = analyzeOpenedVsClosed(tickets, interval, startDate, endDate);
+    } else if (analysisType === 'percentClosed') { // <-- ADD THIS
+        aggregatedData = analyzePercentClosed(tickets, interval, startDate, endDate);
     } else if (analysisType === 'activeTickets') {
         aggregatedData = analyzeActiveTickets(tickets, interval, startDate, endDate);
     } else if (analysisType === 'activeTicketsAge') {
@@ -226,6 +228,52 @@ function analyzeOpenedVsClosed(tickets, interval, startDate, endDate) {
 
     const sortedKeys = Object.keys(counts).sort();
     return sortedKeys.map(key => ({ label: key, value: counts[key] }));
+}
+
+// --- 3A-4. Percent Closed Function ---
+function analyzePercentClosed(tickets, interval, startDate, endDate) {
+    const counts = {};
+
+    tickets.forEach(ticket => {
+        // We group these strictly by the date they were OPENED
+        const openStr = ticket['Opening Date'];
+        if (!openStr) return;
+
+        const openDate = new Date(openStr.replace(' ', 'T'));
+        if (isNaN(openDate.getTime())) return;
+
+        // Respect date filters
+        if ((startDate && openDate < startDate) || (endDate && openDate > endDate)) return;
+
+        let key = getIntervalKey(openDate, interval);
+        if (!counts[key]) counts[key] = { opened: 0, closed: 0, isPercentage: true };
+
+        counts[key].opened++;
+
+        // If it's closed (regardless of WHEN it closed), increment the closed tally for this cohort
+        const status = (ticket['Status'] || '').toLowerCase().trim();
+        const isClosed = status.includes('solved') || status.includes('closed');
+        if (isClosed) {
+            counts[key].closed++;
+        }
+    });
+
+    const sortedKeys = Object.keys(counts).sort();
+    return sortedKeys.map(key => {
+        const data = counts[key];
+        // Calculate percentage, preventing division by zero just in case
+        const percentage = data.opened === 0 ? 0 : Math.round((data.closed / data.opened) * 100);
+        
+        return { 
+            label: key, 
+            value: { 
+                percent: percentage, 
+                opened: data.opened, 
+                closed: data.closed,
+                isPercentage: true 
+            } 
+        };
+    });
 }
 
 // --- 3B. Active/Open Tickets Function ---
@@ -617,7 +665,9 @@ function drawGraph(data, chartTitle = '') {
 
     // --- BAR CHART DRAWING LOGIC ---
     const isStacked = data[0].value && data[0].value.isStacked === true;
-    const isGrouped = data[0].value && data[0].value.isGrouped === true; // NEW
+    const isGrouped = data[0].value && data[0].value.isGrouped === true;
+    const isPercentage = data[0].value && data[0].value.isPercentage === true; // NEW
+
     const isV2 = isStacked && data[0].value.stackType === 'v2';
     const isV3 = isStacked && data[0].value.stackType === 'v3';
     const isV2orV3 = isV2 || isV3;
@@ -635,6 +685,8 @@ function drawGraph(data, chartTitle = '') {
         maxValue = Math.max(...data.map(d => d.value.total));
     } else if (isGrouped) {
         maxValue = Math.max(...data.map(d => Math.max(d.value.opened, d.value.closed)));
+    } else if (isPercentage) {
+        maxValue = 100; // Percentages are always out of 100!
     } else {
         maxValue = Math.max(...data.map(d => d.value));
     }
@@ -814,6 +866,20 @@ function drawGraph(data, chartTitle = '') {
             if (closedCount > 0) {
                 ctx.fillText(closedCount, x + (gap/2) + subBarWidth + (subBarWidth / 2), closedY - 5);
             }
+        } else if (isPercentage) {
+            // NEW: Drawing logic for the Percentage bars
+            const pct = item.value.percent;
+            const barHeight = (pct / 100) * graphHeight;
+            const y = canvas.height - paddingBottom - barHeight;
+            
+            // Let's use a nice distinct purple for this special metric
+            ctx.fillStyle = '#9C27B0'; 
+            ctx.fillRect(x, y, barWidth - gap, barHeight);
+            
+            // Draw the percentage text on top
+            ctx.fillStyle = '#000';
+            ctx.font = '12px Arial';
+            ctx.fillText(pct + '%', x + (barWidth - gap) / 2, y - 5);
 
         } else {
             const barHeight = maxValue === 0 ? 0 : (item.value / maxValue) * graphHeight;
