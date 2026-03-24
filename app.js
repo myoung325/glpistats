@@ -69,6 +69,10 @@ function runAnalysis(tickets) {
 
     if (analysisType === 'ticketsOpened') {
         aggregatedData = analyzeTicketsOpened(tickets, interval, startDate, endDate);
+    } else if (analysisType === 'ticketsClosed') {
+        aggregatedData = analyzeTicketsClosed(tickets, interval, startDate, endDate);
+    } else if (analysisType === 'openedVsClosed') { // <-- ADD THIS
+        aggregatedData = analyzeOpenedVsClosed(tickets, interval, startDate, endDate);
     } else if (analysisType === 'activeTickets') {
         aggregatedData = analyzeActiveTickets(tickets, interval, startDate, endDate);
     } else if (analysisType === 'activeTicketsAge') {
@@ -144,6 +148,80 @@ function analyzeTicketsOpened(tickets, interval, startDate, endDate) {
 
         let key = getIntervalKey(date, interval);
         counts[key] = (counts[key] || 0) + 1;
+    });
+
+    const sortedKeys = Object.keys(counts).sort();
+    return sortedKeys.map(key => ({ label: key, value: counts[key] }));
+}
+
+// --- 3A-2. Tickets Closed Function ---
+function analyzeTicketsClosed(tickets, interval, startDate, endDate) {
+    const counts = {};
+
+    tickets.forEach(ticket => {
+        // 1. We only care about tickets that are actually closed/solved
+        const status = (ticket['Status'] || '').toLowerCase().trim();
+        const isClosed = status.includes('solved') || status.includes('closed');
+        if (!isClosed) return; 
+
+        // 2. Grab the date it was closed
+        const endString = ticket['Last Update'];
+        if (!endString) return;
+
+        const date = new Date(endString.replace(' ', 'T'));
+        if (isNaN(date.getTime())) return; 
+        
+        // 3. Respect the user's date filters based on the CLOSE date
+        if (startDate && date < startDate) return;
+        if (endDate && date > endDate) return;
+
+        // 4. Group it into the correct bar on the chart
+        let key = getIntervalKey(date, interval);
+        counts[key] = (counts[key] || 0) + 1;
+    });
+
+    const sortedKeys = Object.keys(counts).sort();
+    return sortedKeys.map(key => ({ label: key, value: counts[key] }));
+}
+
+// --- 3A-3. Opened vs Closed Function ---
+function analyzeOpenedVsClosed(tickets, interval, startDate, endDate) {
+    const counts = {};
+
+    const initBucket = (key) => {
+        if (!counts[key]) counts[key] = { opened: 0, closed: 0, isGrouped: true };
+    };
+
+    tickets.forEach(ticket => {
+        // 1. Tally Opened Tickets
+        const openStr = ticket['Opening Date'];
+        if (openStr) {
+            const openDate = new Date(openStr.replace(' ', 'T'));
+            if (!isNaN(openDate.getTime())) {
+                if ((!startDate || openDate >= startDate) && (!endDate || openDate <= endDate)) {
+                    let key = getIntervalKey(openDate, interval);
+                    initBucket(key);
+                    counts[key].opened++;
+                }
+            }
+        }
+
+        // 2. Tally Closed Tickets
+        const status = (ticket['Status'] || '').toLowerCase().trim();
+        const isClosed = status.includes('solved') || status.includes('closed');
+        if (isClosed) {
+            const closeStr = ticket['Last Update'];
+            if (closeStr) {
+                const closeDate = new Date(closeStr.replace(' ', 'T'));
+                if (!isNaN(closeDate.getTime())) {
+                    if ((!startDate || closeDate >= startDate) && (!endDate || closeDate <= endDate)) {
+                        let key = getIntervalKey(closeDate, interval);
+                        initBucket(key);
+                        counts[key].closed++;
+                    }
+                }
+            }
+        }
     });
 
     const sortedKeys = Object.keys(counts).sort();
@@ -539,21 +617,27 @@ function drawGraph(data, chartTitle = '') {
 
     // --- BAR CHART DRAWING LOGIC ---
     const isStacked = data[0].value && data[0].value.isStacked === true;
+    const isGrouped = data[0].value && data[0].value.isGrouped === true; // NEW
     const isV2 = isStacked && data[0].value.stackType === 'v2';
     const isV3 = isStacked && data[0].value.stackType === 'v3';
     const isV2orV3 = isV2 || isV3;
 
-    // Increased top padding so tall bars don't hit the legend
-    const paddingTop = isStacked ? (isV2orV3 ? 130 : 110) : 70;
+    const paddingTop = (isStacked || isGrouped) ? (isV2orV3 ? 130 : 110) : 70;
     const paddingSides = 60;
     const paddingBottom = 120; 
     
     const graphWidth = canvas.width - (paddingSides * 2);
     const graphHeight = canvas.height - (paddingTop + paddingBottom);
     
-    const maxValue = isStacked 
-        ? Math.max(...data.map(d => d.value.total)) 
-        : Math.max(...data.map(d => d.value));
+    // NEW Max Value Logic
+    let maxValue = 0;
+    if (isStacked) {
+        maxValue = Math.max(...data.map(d => d.value.total));
+    } else if (isGrouped) {
+        maxValue = Math.max(...data.map(d => Math.max(d.value.opened, d.value.closed)));
+    } else {
+        maxValue = Math.max(...data.map(d => d.value));
+    }
     
     if (isStacked) {
         const legendItems = isV2orV3 ? [
@@ -615,6 +699,24 @@ function drawGraph(data, chartTitle = '') {
             });
             legendY += 25;
         });
+    } else if (isGrouped) {
+        ctx.font = "14px Arial";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        let startX = canvas.width / 2 - 60;
+        
+        // Opened Legend
+        ctx.fillStyle = '#4A90E2';
+        ctx.fillRect(startX, 35, 15, 15);
+        ctx.fillStyle = '#000';
+        ctx.fillText('Opened', startX + 45, 43);
+        
+        // Closed Legend
+        ctx.fillStyle = '#4CAF50';
+        ctx.fillRect(startX + 90, 35, 15, 15);
+        ctx.fillStyle = '#000';
+        ctx.fillText('Closed', startX + 135, 43);
     }
 
     ctx.beginPath();
@@ -678,6 +780,40 @@ function drawGraph(data, chartTitle = '') {
 
             ctx.fillStyle = '#000';
             ctx.fillText(item.value.total, x + (barWidth / 2), currentY - 5);
+
+        } else if (isGrouped) {
+            const openedCount = item.value.opened;
+            const closedCount = item.value.closed;
+            
+            // Split the available bar width in half
+            const groupWidth = barWidth - gap;
+            const subBarWidth = groupWidth / 2;
+
+            // Draw Opened Bar (Blue, Left side)
+            const openedHeight = maxValue === 0 ? 0 : (openedCount / maxValue) * graphHeight;
+            const openedY = canvas.height - paddingBottom - openedHeight;
+            ctx.fillStyle = '#4A90E2';
+            ctx.fillRect(x + (gap/2), openedY, subBarWidth, openedHeight);
+            
+            // Draw Closed Bar (Green, Right side)
+            const closedHeight = maxValue === 0 ? 0 : (closedCount / maxValue) * graphHeight;
+            const closedY = canvas.height - paddingBottom - closedHeight;
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(x + (gap/2) + subBarWidth, closedY, subBarWidth, closedHeight);
+
+            // Add the text numbers on top of both bars
+            ctx.fillStyle = '#000';
+            
+            // NEW: Dynamically shrink font based on the sub-bar width
+            const fontSize = subBarWidth < 25 ? 9 : 11; 
+            ctx.font = `${fontSize}px Arial`;
+
+            if (openedCount > 0) {
+                ctx.fillText(openedCount, x + (gap/2) + (subBarWidth / 2), openedY - 5);
+            }
+            if (closedCount > 0) {
+                ctx.fillText(closedCount, x + (gap/2) + subBarWidth + (subBarWidth / 2), closedY - 5);
+            }
 
         } else {
             const barHeight = maxValue === 0 ? 0 : (item.value / maxValue) * graphHeight;
